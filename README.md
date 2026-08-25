@@ -150,17 +150,126 @@ Things that matter specifically outside local dev:
 
 ## Running with Docker
 
+This is the fastest path to a working instance — no Go toolchain needed on
+the host at all, just Docker. `docker-compose.yml` runs exactly two
+services, `mongo` and `app` (built from the `Dockerfile`); nothing else to
+install.
+
+### Prerequisites
+
+- Docker with the Compose v2 plugin — `docker compose version` should print
+  something, not error (the old standalone `docker-compose` v1 binary isn't
+  what these instructions use)
+
+### 1. Get the source
+
 ```sh
-docker compose up -d          # starts Mongo + the app, builds the image on first run
-docker compose run --rm app /app/seedadmin -email=you@example.com -password=... -name="You"
+git clone <this-repo-url> queue-manager
+cd queue-manager
 ```
 
-The console is then at `http://localhost:8080`. `docker-compose.yml` runs
-two services — `mongo` (data persisted in a named volume) and `app` (built
-from the `Dockerfile`) — nothing else to install. Set a stable `JWT_SECRET`
-in `docker-compose.yml` (or an `.env` file compose picks up automatically)
-for anything beyond a quick local try — without one, every admin session is
-invalidated whenever the container restarts.
+### 2. (Recommended) set a stable JWT_SECRET
+
+Skip this for a quick local try — the server will generate a random secret
+and log a warning. Set a real one for anything you'll come back to, since
+without a stable secret every admin session is invalidated whenever the
+container restarts:
+
+```sh
+cp -n .env.example .env      # only copies if you don't already have one
+```
+
+Then open `.env` and set `JWT_SECRET=` to a real value, e.g. the output of
+`openssl rand -hex 32`. Docker Compose loads this same `.env` file
+automatically for its own variable substitution — it's the same file the
+non-Docker path below uses, so if you've already run through "Running
+locally" you likely have one set up already and can skip this step. (Note
+the mechanism is different even though the file is shared: the container
+never sees `.env` itself — Compose reads it and passes `JWT_SECRET` in as a
+real environment variable, same as any other `environment:` entry.)
+
+### 3. Build and start
+
+```sh
+docker compose up -d --build
+```
+
+First run builds the image (a minute or two); after that, `up -d` just
+starts the existing one. Mongo's data lives in a named Docker volume
+(`mongo_data`), so it survives `docker compose down` and container
+restarts — only `docker compose down -v` (or deleting the volume directly)
+throws it away.
+
+### 4. Create the first console admin
+
+There's no public sign-up — same as the non-Docker path, the first admin
+is created via `seedadmin`, run once inside the running `app` container:
+
+```sh
+docker compose run --rm app /app/seedadmin -email=you@example.com -password=yourpass -name="You"
+```
+
+Always pass explicit flags here, the same as outside Docker — the bare-flag
+defaults (`admin@example.com` / `12345678`) are public and guessable to
+anyone who's read this file.
+
+### 5. Open the console
+
+`http://localhost:8080` (or whatever `APP_HOST_PORT` you set — see below).
+
+### Configuration
+
+Set these in the `.env` file from step 2, or export them in your shell
+before `docker compose up` — either way Compose picks them up:
+
+| Variable        | Default  | Purpose                                                          |
+|-----------------|----------|-------------------------------------------------------------------|
+| `JWT_SECRET`    | *(none)* | Signs admin session/2FA tokens — set a stable value (step 2)     |
+| `APP_HOST_PORT` | `8080`   | Host port the console/ingest endpoint is published on            |
+
+`APP_HOST_PORT` matters if 8080 is already taken on your host, or if
+you're running more than one instance side by side (this is also what
+`scripts/e2e-docker-test.sh` uses to test without colliding with a real
+deployment — see "Tests" below).
+
+### Day-to-day operations
+
+```sh
+docker compose logs -f app      # tail the app's logs
+docker compose restart app      # restart just the app (Mongo keeps running)
+docker compose down             # stop everything, keep the mongo_data volume
+docker compose down -v          # stop everything AND delete all Mongo data
+```
+
+To pick up a code change (yours, or a `git pull` of a new release), rebuild
+and recreate just the app container — Mongo and its data are untouched:
+
+```sh
+git pull
+docker compose up -d --build app
+```
+
+### Verifying it actually works
+
+`scripts/e2e-docker-test.sh` drives this exact `docker compose` setup
+through a real ingest → decrypt → route → throttle → forward → retry cycle
+end to end (see "Tests" below) — worth running once after your first setup,
+or after pulling an update, to confirm the whole stack is healthy.
+
+### Running without Compose
+
+If you'd rather point the container at a Mongo you already run elsewhere,
+skip Compose and run the image directly:
+
+```sh
+docker build -t queue-manager .
+docker run -d --name queue-manager -p 8080:8080 \
+  -e MONGO_URI="mongodb://your-mongo-host:27017" \
+  -e MONGO_DB_NAME="queue_manager" \
+  -e JWT_SECRET="$(openssl rand -hex 32)" \
+  queue-manager
+docker exec queue-manager /app/seedadmin -email=you@example.com -password=yourpass -name="You"
+```
 
 ## Project layout
 
