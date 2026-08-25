@@ -1,18 +1,40 @@
 # Queue Manager
 
-An internal service that decouples third-party systems (e.g. SAP) from calling
-backend services (e.g. Inventory) directly. Instead of a direct call that can
-spike production DB/CPU, third parties POST to a Queue-owned entry point,
-Queue persists the request as pending, and a throttled Go worker forwards it
-to the real destination endpoint at a controlled pace. Console admins get a
-web console to manage integrations and manually retry failures.
+An open-source, self-hosted service that decouples third-party systems (an
+ERP, a POS, a logistics platform — anything external) from calling your
+backend services directly, so a burst or a misbehaving integration never
+turns into a spike against production.
 
-No message broker to install or operate — MongoDB is the only external
-dependency. Dispatch is handled in-process: each destination gets its own
-goroutine that claims its oldest pending request straight out of MongoDB
-(the same atomic claim regardless of how many app instances end up polling
-it), forwards it, and paces the next claim by that destination's configured
-throttle.
+## What is Queue Manager?
+
+Instead of a third party calling your backend directly, it POSTs an
+encrypted payload to a Queue-owned entry point. Queue Manager persists the
+request, then a throttled worker forwards it to the real destination at a
+controlled, configurable pace — decoupling "how fast the third party sends"
+from "how fast your backend can safely take it."
+
+It's built to be genuinely self-hosted with as few moving parts as
+possible:
+
+- **One external dependency: MongoDB.** No message broker to install,
+  configure, or monitor — dispatch is handled entirely in-process, backed
+  by Mongo (see "How it works" below).
+- **Open source, single Go binary** plus a plain HTML/JS console — no
+  frontend build step, no separate frontend service.
+- **Encrypted ingest.** Payloads travel AES-256-CBC encrypted end to end;
+  only Queue Manager, holding the integration's key/IV, can read them.
+- **Throttled, per-destination pacing** that protects each downstream
+  service independently, even when several destinations share one channel.
+- **Multi-destination routing** — fan one entry point out to several
+  destinations by a field in the payload, no hand-rolled rules engine.
+- **Manual retry with a full audit trail.** Every request's outcome,
+  decrypted body, and raw response is visible in the console; nothing
+  retries automatically and silently.
+- **Automatic cleanup** — requests expire and are purged per-channel on a
+  retention period you configure.
+- **An admin console with real access control** — bcrypt passwords, JWT
+  sessions, optional TOTP two-factor, and a super-admin role gating who can
+  manage other admins.
 
 **Terminology note:** the UI and this doc use product-facing names that
 differ from the underlying code/schema names (kept as-is internally to
@@ -22,6 +44,19 @@ Request** (code: `request`). Where this doc references an actual field, route,
 or collection name, it uses the code name verbatim in backticks.
 
 ## How it works
+
+```mermaid
+flowchart LR
+    TP["Third party<br/>ERP, POS, ..."] -->|POST encrypted payload| ING["Ingest endpoint"]
+    ING --> DEC["Decrypt with the<br/>integration's key/IV"]
+    DEC --> ROUTE["Resolve destination<br/>routing field, if more than one"]
+    ROUTE --> MONGO["MongoDB<br/>requests: pending"]
+    MONGO --> WORKER["Per-destination worker<br/>throttled, claims oldest pending"]
+    WORKER -->|forward| BACKEND["Real backend endpoint"]
+    BACKEND -->|2xx| OK["success"]
+    BACKEND -->|error or timeout| BAD["failed"]
+    BAD -->|admin clicks Retry| MONGO
+```
 
 1. A third party POSTs an AES-256-CBC encrypted payload to
    `POST /ingest/<entry-point>`.
@@ -68,6 +103,130 @@ start, so nothing is silently dropped by an unclean shutdown.
 
 That's it — no message broker or other service to stand up. Dispatch is
 in-process, backed entirely by MongoDB.
+
+## Running with Docker
+
+This is the fastest path to a working instance — no Go toolchain needed on
+the host at all, just Docker. `docker-compose.yml` runs exactly two
+services, `mongo` and `app` (built from the `Dockerfile`); nothing else to
+install.
+
+### Prerequisites
+
+- Docker with the Compose v2 plugin — `docker compose version` should print
+  something, not error (the old standalone `docker-compose` v1 binary isn't
+  what these instructions use)
+
+### 1. Get the source
+
+```sh
+git clone <this-repo-url> queue-manager
+cd queue-manager
+```
+
+### 2. (Recommended) set a stable JWT_SECRET
+
+Skip this for a quick local try — the server will generate a random secret
+and log a warning. Set a real one for anything you'll come back to, since
+without a stable secret every admin session is invalidated whenever the
+container restarts:
+
+```sh
+cp -n .env.example .env      # only copies if you don't already have one
+```
+
+Then open `.env` and set `JWT_SECRET=` to a real value, e.g. the output of
+`openssl rand -hex 32`. Docker Compose loads this same `.env` file
+automatically for its own variable substitution — it's the same file the
+non-Docker path below uses, so if you've already run through "Running
+locally" you likely have one set up already and can skip this step. (Note
+the mechanism is different even though the file is shared: the container
+never sees `.env` itself — Compose reads it and passes `JWT_SECRET` in as a
+real environment variable, same as any other `environment:` entry.)
+
+### 3. Build and start
+
+```sh
+docker compose up -d --build
+```
+
+First run builds the image (a minute or two); after that, `up -d` just
+starts the existing one. Mongo's data lives in a named Docker volume
+(`mongo_data`), so it survives `docker compose down` and container
+restarts — only `docker compose down -v` (or deleting the volume directly)
+throws it away.
+
+### 4. Create the first console admin
+
+There's no public sign-up — same as the non-Docker path, the first admin
+is created via `seedadmin`, run once inside the running `app` container:
+
+```sh
+docker compose run --rm app /app/seedadmin -email=you@example.com -password=yourpass -name="You"
+```
+
+Always pass explicit flags here, the same as outside Docker — the bare-flag
+defaults (`admin@example.com` / `12345678`) are public and guessable to
+anyone who's read this file. The password must be at least 8 characters,
+same rule the console's own admin-creation form enforces.
+
+### 5. Open the console
+
+`http://localhost:8080` (or whatever `APP_HOST_PORT` you set — see below).
+
+### Configuration
+
+Set these in the `.env` file from step 2, or export them in your shell
+before `docker compose up` — either way Compose picks them up:
+
+| Variable        | Default  | Purpose                                                          |
+|-----------------|----------|-------------------------------------------------------------------|
+| `JWT_SECRET`    | *(none)* | Signs admin session/2FA tokens — set a stable value (step 2)     |
+| `APP_HOST_PORT` | `8080`   | Host port the console/ingest endpoint is published on            |
+
+`APP_HOST_PORT` matters if 8080 is already taken on your host, or if
+you're running more than one instance side by side (this is also what
+`scripts/e2e-docker-test.sh` uses to test without colliding with a real
+deployment — see "Tests" below).
+
+### Day-to-day operations
+
+```sh
+docker compose logs -f app      # tail the app's logs
+docker compose restart app      # restart just the app (Mongo keeps running)
+docker compose down             # stop everything, keep the mongo_data volume
+docker compose down -v          # stop everything AND delete all Mongo data
+```
+
+To pick up a code change (yours, or a `git pull` of a new release), rebuild
+and recreate just the app container — Mongo and its data are untouched:
+
+```sh
+git pull
+docker compose up -d --build app
+```
+
+### Verifying it actually works
+
+`scripts/e2e-docker-test.sh` drives this exact `docker compose` setup
+through a real ingest → decrypt → route → throttle → forward → retry cycle
+end to end (see "Tests" below) — worth running once after your first setup,
+or after pulling an update, to confirm the whole stack is healthy.
+
+### Running without Compose
+
+If you'd rather point the container at a Mongo you already run elsewhere,
+skip Compose and run the image directly:
+
+```sh
+docker build -t queue-manager .
+docker run -d --name queue-manager -p 8080:8080 \
+  -e MONGO_URI="mongodb://your-mongo-host:27017" \
+  -e MONGO_DB_NAME="queue_manager" \
+  -e JWT_SECRET="$(openssl rand -hex 32)" \
+  queue-manager
+docker exec queue-manager /app/seedadmin -email=you@example.com -password=yourpass -name="You"
+```
 
 ## Running locally
 
@@ -148,128 +307,177 @@ Things that matter specifically outside local dev:
   console admins are created from inside the app by an existing console
   admin, not via this CLI.
 
-## Running with Docker
+## How to use the console
 
-This is the fastest path to a working instance — no Go toolchain needed on
-the host at all, just Docker. `docker-compose.yml` runs exactly two
-services, `mongo` and `app` (built from the `Dockerfile`); nothing else to
-install.
+Once you're logged in, here's a walkthrough of the four things you'll do
+most — using the same sample data as the in-app **Setup Guide**
+(open `/guide.html` from the sidebar once your instance is running), so
+every screenshot below matches what you'd actually see.
 
-### Prerequisites
+### 1. Create an Integration
 
-- Docker with the Compose v2 plugin — `docker compose version` should print
-  something, not error (the old standalone `docker-compose` v1 binary isn't
-  what these instructions use)
+An Integration represents one third-party system that will send data into
+the queue — an ERP, a POS, a logistics platform, anything that needs to
+call into your backend without calling it directly. Each one gets its own
+AES-256 key and IV, so a problem with one third party's credentials never
+affects another's. Create the integration first; a Transmission Channel
+always belongs to one.
 
-### 1. Get the source
+Open **Integrations** and click **+ New integration**. The list shows every
+third-party system you've onboarded, its description, and its
+authentication key/IV (masked on screen, with a one-click Copy button — the
+API still returns the real values to any signed-in console admin, this is
+just a display choice).
 
-```sh
-git clone <this-repo-url> queue-manager
-cd queue-manager
-```
+![Integrations list showing Saffron ERP, Suvidha POS, Bharat Logistics Hub, and Anand Retail Systems](web/static/img/guide/integrations-list.jpg)
 
-### 2. (Recommended) set a stable JWT_SECRET
+Give the integration a name and description, then set:
 
-Skip this for a quick local try — the server will generate a random secret
-and log a warning. Set a real one for anything you'll come back to, since
-without a stable secret every admin session is invalidated whenever the
-container restarts:
+- **Authentication key** — exactly 32 characters, used as the AES-256 key
+- **Authentication IV** — exactly 16 characters, the initialization vector
 
-```sh
-cp -n .env.example .env      # only copies if you don't already have one
-```
+Both travel to the third party out of band (Slack, a shared doc, however
+you hand off credentials today) — Queue Manager never transmits them
+anywhere itself, it only stores them to decrypt what comes back in.
 
-Then open `.env` and set `JWT_SECRET=` to a real value, e.g. the output of
-`openssl rand -hex 32`. Docker Compose loads this same `.env` file
-automatically for its own variable substitution — it's the same file the
-non-Docker path below uses, so if you've already run through "Running
-locally" you likely have one set up already and can skip this step. (Note
-the mechanism is different even though the file is shared: the container
-never sees `.env` itself — Compose reads it and passes `JWT_SECRET` in as a
-real environment variable, same as any other `environment:` entry.)
+![New integration dialog filled in for Saffron ERP with name, description, authentication key and IV](web/static/img/guide/integrations-new-form.jpg)
 
-### 3. Build and start
+Save, and the integration is ready to be attached to one or more
+Transmission Channels. Nothing is listening for traffic yet — an
+integration on its own doesn't expose any URL.
 
-```sh
-docker compose up -d --build
-```
+### 2. Set up a Transmission Channel
 
-First run builds the image (a minute or two); after that, `up -d` just
-starts the existing one. Mongo's data lives in a named Docker volume
-(`mongo_data`), so it survives `docker compose down` and container
-restarts — only `docker compose down -v` (or deleting the volume directly)
-throws it away.
+A Transmission Channel is one entry point URL that the third party posts
+encrypted payloads to. Behind it, Queue Manager fans requests out to one or
+more destinations at a controlled, throttled pace — so a burst from the
+third party never turns into a burst against your real backend.
 
-### 4. Create the first console admin
+Open **Transmission Channels** and click **+ New transmission channel**.
+Each row shows which integration the channel belongs to, its entry point,
+how many destinations it fans out to, its retention (TTL), and whether
+it's active.
 
-There's no public sign-up — same as the non-Docker path, the first admin
-is created via `seedadmin`, run once inside the running `app` container:
+![Transmission Channels list showing Bill Settlement Sync, Loyalty Points Sync (inactive), Order Sync, and Shipment Status Sync](web/static/img/guide/channels-list.jpg)
 
-```sh
-docker compose run --rm app /app/seedadmin -email=you@example.com -password=yourpass -name="You"
-```
+The dialog is a 3-step wizard:
 
-Always pass explicit flags here, the same as outside Docker — the bare-flag
-defaults (`admin@example.com` / `12345678`) are public and guessable to
-anyone who's read this file.
+**Step 1 — Channel Detail.** Pick which Integration this channel belongs
+to, then give the channel its own name and description. One integration
+can own several channels — sharing the same key/IV but each with its own
+entry point, retention, and destinations.
 
-### 5. Open the console
+![Step 1 of the new transmission channel wizard filled in for Bill Settlement Sync under Suvidha POS](web/static/img/guide/channels-wizard-step1.jpg)
 
-`http://localhost:8080` (or whatever `APP_HOST_PORT` you set — see below).
+**Step 2 — Channel Setup.** Set the entry point slug (the path third
+parties POST to) and how long to keep request records before automatic
+cleanup. Then add one or more **destinations**, each with its own endpoint
+URL and a throttle (gap between sends, in seconds) — this is what protects
+the real backend. With a single destination, every request goes straight
+there, no routing needed.
 
-### Configuration
+Add a second destination and a **Routing field** appears. Below,
+`payment_type` routes to **UPI Payments API** (value `upi`) or **Card
+Payments API** (value `card`) — Queue Manager reads that field out of the
+decrypted payload and hands the request to whichever destination's value
+matches.
 
-Set these in the `.env` file from step 2, or export them in your shell
-before `docker compose up` — either way Compose picks them up:
+![Step 2 of the new transmission channel wizard: entry point, TTL, routing field payment_type, and the UPI Payments API destination](web/static/img/guide/channels-wizard-step2.jpg)
 
-| Variable        | Default  | Purpose                                                          |
-|-----------------|----------|-------------------------------------------------------------------|
-| `JWT_SECRET`    | *(none)* | Signs admin session/2FA tokens — set a stable value (step 2)     |
-| `APP_HOST_PORT` | `8080`   | Host port the console/ingest endpoint is published on            |
+**Step 3 — Review.** Shows every destination with its resolved routing
+rule in plain language, so you can sanity-check the whole fan-out before
+committing. From here, **Download sample integration doc** generates a
+Markdown handoff file with the real ingest URL, headers, the encryption
+recipe, the integration's key/IV, and — per destination — a sample payload
+already encrypted with the real key/IV plus a ready-to-run `curl` command,
+so whoever implements the sending side has nothing left to guess.
 
-`APP_HOST_PORT` matters if 8080 is already taken on your host, or if
-you're running more than one instance side by side (this is also what
-`scripts/e2e-docker-test.sh` uses to test without colliding with a real
-deployment — see "Tests" below).
+![Step 3 of the new transmission channel wizard: review showing both destinations' routing rules and the download sample doc button](web/static/img/guide/channels-wizard-step3.jpg)
 
-### Day-to-day operations
+Saving creates the channel **inactive** — nothing is listening yet. Click
+**Activate** on its row to start a worker for each destination; the entry
+point only starts accepting traffic once you do. **Deactivate** reverses it
+without deleting anything — requests already waiting for a destination
+stay queued untouched, so pausing a channel to fix a downstream issue never
+drops a backlog.
 
-```sh
-docker compose logs -f app      # tail the app's logs
-docker compose restart app      # restart just the app (Mongo keeps running)
-docker compose down             # stop everything, keep the mongo_data volume
-docker compose down -v          # stop everything AND delete all Mongo data
-```
+![Transmission Channels list with Loyalty Points Sync inactive and an Activate button on its row](web/static/img/guide/channels-list-with-activate.jpg)
 
-To pick up a code change (yours, or a `git pull` of a new release), rebuild
-and recreate just the app container — Mongo and its data are untouched:
+### 3. Monitor & retry Transmission Requests
 
-```sh
-git pull
-docker compose up -d --build app
-```
+Every payload that hits a channel's entry point becomes one Transmission
+Request — this is the single place to see everything that has flowed
+through the queue, in every state, across every channel and destination,
+and to step in by hand when something on the receiving end goes wrong.
 
-### Verifying it actually works
+Open **Transmission Requests**. Narrow the grid by channel, status
+(`pending`/`processing`/`success`/`failed`), or date range, or search the
+currently loaded rows by request ID or channel name. The colored rail on
+the left edge of each row is the fastest way to scan a long list for
+trouble — green for success, red for failed.
 
-`scripts/e2e-docker-test.sh` drives this exact `docker compose` setup
-through a real ingest → decrypt → route → throttle → forward → retry cycle
-end to end (see "Tests" below) — worth running once after your first setup,
-or after pulling an update, to confirm the whole stack is healthy.
+![Transmission Requests grid with ten rows across four channels including one Order Sync retry](web/static/img/guide/requests-grid.jpg)
 
-### Running without Compose
+Click **View** on any row for its full detail: which channel and
+destination it was headed to, the exact endpoint URL called, the request's
+decrypted body exactly as received, and the raw response (HTTP status +
+body) that came back. Below, an order failed with HTTP 500 because the
+destination endpoint was temporarily broken — the response body makes the
+reason obvious without needing to check server logs.
 
-If you'd rather point the container at a Mongo you already run elsewhere,
-skip Compose and run the image directly:
+![Transmission Request detail dialog for a failed Order Sync request showing the decrypted payload and a 500 response](web/static/img/guide/requests-detail-failed.jpg)
 
-```sh
-docker build -t queue-manager .
-docker run -d --name queue-manager -p 8080:8080 \
-  -e MONGO_URI="mongodb://your-mongo-host:27017" \
-  -e MONGO_DB_NAME="queue_manager" \
-  -e JWT_SECRET="$(openssl rand -hex 32)" \
-  queue-manager
-docker exec queue-manager /app/seedadmin -email=you@example.com -password=yourpass -name="You"
-```
+Fix the underlying problem first (in this example, correct the
+destination's endpoint URL on the channel), then click **Retry** from the
+detail dialog or straight from the grid row. Retry always re-publishes
+against the destination's *current* configuration, not whatever was in
+effect when it first failed — so "fix the endpoint, then retry" genuinely
+works. The retry count ticks up and the original decrypted payload is
+reused as-is.
+
+![Transmission Requests grid showing the previously-failed Order Sync request now succeeded with a retry count of 1](web/static/img/guide/requests-after-retry.jpg)
+
+Retry is always a manual, deliberate action — Queue Manager never
+auto-retries a failed request on its own. A downstream outage shouldn't
+turn into a retry storm hammering the same broken endpoint.
+
+### 4. Manage your team (Console Admins)
+
+Console Admins are the people who can sign in and manage this console.
+They're added here by an existing admin, not through public sign-up —
+there's deliberately no registration page.
+
+Open **Console Admins**. The very first admin ever seeded on a fresh
+install becomes the **Super Admin** automatically. Only a Super Admin can
+create new console admins or turn off someone else's two-factor
+authentication; every other admin can see this list — including everyone's
+role and 2FA status — but can't edit it, add to it, or act on anyone but
+themselves.
+
+![Console Admins list showing Super Admin Rohan Mehta, Ananya Iyer with 2FA on, and Vikram Nair pending 2FA setup](web/static/img/guide/admins-list.jpg)
+
+As a Super Admin, click **+ New console admin** and fill in their name, an
+optional contact number, email, and a starting password (at least 8
+characters). Check **"Require two-factor authentication setup before first
+login"** to force them through QR-code enrollment the very first time they
+sign in — they can't reach any other page in the console until they've
+confirmed a valid code. Leave it unchecked and they can sign in with just
+their password and opt into 2FA on their own terms later.
+
+![New console admin dialog filled in for Vikram Nair with the Require two-factor authentication checkbox checked](web/static/img/guide/admins-new-form.jpg)
+
+Turning 2FA **on** is unrestricted self-service for every admin, regardless
+of role. Turning it **off** is deliberately one-directional: only a Super
+Admin can disable another admin's 2FA (not even their own, without going
+through the same super-admin path) — that asymmetry is intentional, since
+disabling an already-active protection is a recovery action that needs a
+second party involved, exactly the situation when someone loses their
+phone.
+
+---
+
+This walkthrough, kept current with the app, is also available inside the
+console itself under **Setup Guide** once you're logged in.
 
 ## Project layout
 
