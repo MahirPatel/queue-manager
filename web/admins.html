@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Console Admins — Queue Manager</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body data-page="admins">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">◆</span> Queue Manager</div>
+      <nav>
+        <a href="/dashboard.html" data-nav="dashboard">Dashboard</a>
+        <a href="/products.html" data-nav="products">Integrations</a>
+        <a href="/templates.html" data-nav="templates">Transmission Channels</a>
+        <a href="/requests.html" data-nav="requests">Transmission Requests</a>
+        <a href="/admins.html" data-nav="admins">Console Admins</a>
+        <a href="/guide.html" data-nav="guide">Setup Guide</a>
+      </nav>
+      <div class="sidebar-footer">
+        <span id="whoami" class="whoami"></span>
+        <button id="logoutBtn" class="link-btn">Log out</button>
+        <div class="app-credit">Created by Mahir Patel &middot; 2026</div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="content-header">
+        <div>
+          <h1>Console Admins</h1>
+          <p class="content-sub">People who can sign in and manage this console. New console admins are added here, not by public sign-up.</p>
+        </div>
+        <button class="btn btn-primary" id="newAdminBtn">+ New console admin</button>
+      </header>
+
+      <div class="banner banner-error" id="errorBanner"></div>
+
+      <div class="toolbar">
+        <input type="search" id="adminSearch" placeholder="Search by name or email…">
+        <div class="spacer"></div>
+        <div class="dropdown" id="exportDropdown">
+          <button class="btn btn-sm" id="exportMenuBtn" type="button" aria-haspopup="true" aria-expanded="false">Export <span class="dropdown-caret">▾</span></button>
+          <div class="dropdown-menu" id="exportMenu" hidden>
+            <button type="button" class="dropdown-item" id="exportVisibleBtn" title="Export the rows matching your current search">Export visible rows</button>
+            <button type="button" class="dropdown-item" id="exportAllBtn" title="Export every console admin, ignoring search">Export all rows</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Contact</th><th>Role</th><th>2FA</th><th>Status</th><th>Added</th><th>Action</th></tr>
+          </thead>
+          <tbody id="adminsBody">
+            <tr><td colspan="8" class="empty-state">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="load-more">
+        <button class="btn" id="adminsLoadMoreBtn" style="display:none">Load more</button>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="adminDialog">
+    <form id="adminForm">
+      <div class="dialog-header">
+        <h2>New console admin</h2>
+        <button type="button" class="dialog-close" data-close>&times;</button>
+      </div>
+      <div class="dialog-body">
+        <div class="banner banner-error" id="adminFormError"></div>
+        <div class="field">
+          <label for="adminName">Name</label>
+          <input type="text" id="adminName" required>
+        </div>
+        <div class="field">
+          <label for="adminContact">Contact number</label>
+          <input type="text" id="adminContact">
+        </div>
+        <div class="field">
+          <label for="adminEmail">Email</label>
+          <input type="email" id="adminEmail" required>
+        </div>
+        <div class="field">
+          <label for="adminPassword">Password</label>
+          <input type="password" id="adminPassword" required minlength="8">
+          <p class="hint">At least 8 characters.</p>
+        </div>
+        <div class="field field-checkbox">
+          <label class="checkbox-label">
+            <input type="checkbox" id="adminRequire2FA">
+            Require two-factor authentication setup before first login
+          </label>
+          <p class="hint">They'll scan a QR code and confirm a code from an authenticator app (Google Authenticator, Authy, 1Password, etc.) the first time they sign in — they can't reach the console until they do.</p>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Create console admin</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/admins.js"></script>
+</body>
+</html>

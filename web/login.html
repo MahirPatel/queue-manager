@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in — Queue Manager</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="login-shell">
+    <div class="login-card">
+      <div class="login-brand"><span class="brand-mark">◆</span> Queue Manager</div>
+      <p class="login-sub" id="loginSub">Sign in to manage integrations and request traffic.</p>
+
+      <div class="banner banner-error" id="errorBanner"></div>
+
+      <!-- Step: email + password -->
+      <form id="loginForm">
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" required autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary">Sign in</button>
+      </form>
+
+      <!-- Step: TOTP code, hidden until required -->
+      <form id="totpForm" style="display:none">
+        <div class="field">
+          <label for="totpCode">Authenticator code</label>
+          <input type="text" id="totpCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required>
+          <p class="hint">Enter the 6-digit code from your authenticator app.</p>
+        </div>
+        <button type="submit" class="btn btn-primary">Verify</button>
+      </form>
+
+      <p class="login-footnote" id="footnote"></p>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/login.js"></script>
+</body>
+</html>

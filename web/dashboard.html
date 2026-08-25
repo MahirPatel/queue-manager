@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard — Queue Manager</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body data-page="dashboard">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">◆</span> Queue Manager</div>
+      <nav>
+        <a href="/dashboard.html" data-nav="dashboard">Dashboard</a>
+        <a href="/products.html" data-nav="products">Integrations</a>
+        <a href="/templates.html" data-nav="templates">Transmission Channels</a>
+        <a href="/requests.html" data-nav="requests">Transmission Requests</a>
+        <a href="/admins.html" data-nav="admins">Console Admins</a>
+        <a href="/guide.html" data-nav="guide">Setup Guide</a>
+      </nav>
+      <div class="sidebar-footer">
+        <span id="whoami" class="whoami"></span>
+        <button id="logoutBtn" class="link-btn">Log out</button>
+        <div class="app-credit">Created by Mahir Patel &middot; 2026</div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="content-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p class="content-sub">A quick read on integration traffic moving through the queue.</p>
+        </div>
+      </header>
+
+      <div class="banner banner-error" id="errorBanner"></div>
+
+      <div class="stat-grid" id="statGrid">
+        <div class="stat-tile"><div class="stat-value">—</div><div class="stat-label">Integrations</div></div>
+        <div class="stat-tile"><div class="stat-value">—</div><div class="stat-label">Active transmission channels</div></div>
+        <div class="stat-tile"><div class="stat-value">—</div><div class="stat-label">Transmission requests needing retry</div></div>
+      </div>
+
+      <h2 class="section-title">Recent failures</h2>
+      <div class="panel">
+        <table>
+          <thead>
+            <tr><th>Transmission Request</th><th>Transmission Channel</th><th>HTTP</th><th>When</th><th></th></tr>
+          </thead>
+          <tbody id="recentFailuresBody">
+            <tr><td colspan="5" class="empty-state">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

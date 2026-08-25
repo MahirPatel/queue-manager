@@ -1,0 +1,26 @@
+services:
+  mongo:
+    image: mongo:6.0
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    ports:
+      - "${APP_HOST_PORT:-8080}:8080"
+    environment:
+      PORT: "8080"
+      MONGO_URI: "mongodb://mongo:27017"
+      MONGO_DB_NAME: "queue_manager"
+      # Set this (e.g. via a .env file next to this compose file, or your
+      # shell environment) for stable admin sessions across container
+      # restarts. Left unset, the server generates a random one on each
+      # start and every session is invalidated when the container restarts.
+      JWT_SECRET: "${JWT_SECRET:-}"
+
+volumes:
+  mongo_data:

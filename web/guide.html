@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Setup Guide — Queue Manager</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body data-page="guide">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">◆</span> Queue Manager</div>
+      <nav>
+        <a href="/dashboard.html" data-nav="dashboard">Dashboard</a>
+        <a href="/products.html" data-nav="products">Integrations</a>
+        <a href="/templates.html" data-nav="templates">Transmission Channels</a>
+        <a href="/requests.html" data-nav="requests">Transmission Requests</a>
+        <a href="/admins.html" data-nav="admins">Console Admins</a>
+        <a href="/guide.html" data-nav="guide">Setup Guide</a>
+      </nav>
+      <div class="sidebar-footer">
+        <span id="whoami" class="whoami"></span>
+        <button id="logoutBtn" class="link-btn">Log out</button>
+        <div class="app-credit">Created by Mahir Patel &middot; 2026</div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="content-header">
+        <div>
+          <h1>Setup Guide</h1>
+          <p class="content-sub">A screenshot walkthrough of the four things you'll do most, using sample data end to end so every screen below matches what you'd actually see.</p>
+        </div>
+      </header>
+
+      <div class="guide-shell">
+        <nav class="guide-menu" id="guideMenu">
+          <button type="button" class="active" data-topic="integration">
+            <span class="guide-menu-num">1</span> Create an Integration
+          </button>
+          <button type="button" data-topic="channel">
+            <span class="guide-menu-num">2</span> Set up a Transmission Channel
+          </button>
+          <button type="button" data-topic="requests">
+            <span class="guide-menu-num">3</span> Monitor &amp; retry Transmission Requests
+          </button>
+          <button type="button" data-topic="admins">
+            <span class="guide-menu-num">4</span> Manage your team
+          </button>
+        </nav>
+
+        <div class="guide-panel panel">
+
+          <section class="guide-topic active" id="topic-integration">
+            <h2>Create an Integration</h2>
+            <p class="guide-topic-intro">An Integration represents one third-party system that will send data into the queue — an ERP, a POS, a logistics platform, anything that needs to call into your backend without calling it directly. Each one gets its own AES-256 key and IV, so a problem with one third party's credentials never affects another's. Create the integration first; a Transmission Channel always belongs to one.</p>
+
+            <div class="guide-step">
+              <div class="guide-step-num">1</div>
+              <div class="guide-step-body">
+                <h3>Open Integrations and click "+ New integration"</h3>
+                <p>The Integrations list shows every third-party system you've onboarded, its description, and its authentication key/IV (masked, with a one-click Copy button — the backend still returns the real values to any signed-in console admin, this is just a display choice so they aren't sitting in plain text on screen). Below, four are already set up: <strong>Saffron ERP</strong>, <strong>Suvidha POS</strong>, <strong>Bharat Logistics Hub</strong>, and <strong>Anand Retail Systems</strong> — a small ERP, point-of-sale, logistics, and loyalty stack, which is what the rest of this guide is built around.</p>
+                <p>Use the search box to narrow the list by name or description as it grows — searching "sync" here, for instance, would show only these four.</p>
+                <img class="guide-shot" src="/static/img/guide/integrations-list.jpg" alt="Integrations list showing Saffron ERP, Suvidha POS, Bharat Logistics Hub, and Anand Retail Systems">
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-step-num">2</div>
+              <div class="guide-step-body">
+                <h3>Fill in the name and generate a key + IV</h3>
+                <p>Give the integration a name and a short description — the description shows up right in the list, so make it say what the system actually does, not just what it's called. Then set:</p>
+                <p><code>Authentication key</code> — exactly 32 characters, used as the AES-256 key. <code>Authentication IV</code> — exactly 16 characters, the initialization vector. Both travel to the third party out of band (Slack, a shared doc, however you hand off credentials today) — Queue Manager never transmits them anywhere itself, it only stores them to decrypt what comes back in.</p>
+                <img class="guide-shot" src="/static/img/guide/integrations-new-form.jpg" alt="New integration dialog filled in for Saffron ERP with name, description, authentication key and IV">
+                <p class="guide-callout">Save the key and IV somewhere safe the moment you generate them — you'll hand them to whoever implements the sending side, and they're exactly what the downloadable sample integration doc (see the next topic) fills in automatically, so you rarely need to copy them by hand more than once.</p>
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-step-num">3</div>
+              <div class="guide-step-body">
+                <h3>Save</h3>
+                <p>The integration now appears in the list, sorted alongside the rest, and is ready to be attached to one or more Transmission Channels. Nothing is listening for traffic yet — an integration on its own doesn't expose any URL — that only happens once you build a channel on top of it, which is the next topic.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="guide-topic" id="topic-channel">
+            <h2>Set up a Transmission Channel</h2>
+            <p class="guide-topic-intro">A Transmission Channel is one entry point URL that the third party posts encrypted payloads to. Behind it, Queue Manager fans requests out to one or more destinations at a controlled, throttled pace — so a burst from the third party never turns into a burst against your real backend. The "New transmission channel" dialog walks through this in three steps; the two channels used for screenshots below cover both shapes a channel can take.</p>
+
+            <div class="guide-step">
+              <div class="guide-step-num">1</div>
+              <div class="guide-step-body">
+                <h3>Open Transmission Channels and click "+ New transmission channel"</h3>
+                <p>Each row shows which integration the channel belongs to, its entry point, how many destinations it fans out to, its retention (TTL), and whether it's active. Below, <strong>Order Sync</strong> (Saffron ERP) is a simple one-destination channel; <strong>Bill Settlement Sync</strong> (Suvidha POS) fans out to two destinations by payment method; <strong>Shipment Status Sync</strong> is active; and <strong>Loyalty Points Sync</strong> is currently inactive — a normal state for a channel that's paused, being reconfigured, or not live yet.</p>
+                <img class="guide-shot" src="/static/img/guide/channels-list.jpg" alt="Transmission Channels list showing Bill Settlement Sync, Loyalty Points Sync (inactive), Order Sync, and Shipment Status Sync">
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-step-num">2</div>
+              <div class="guide-step-body">
+                <h3>Step 1 — Channel Detail</h3>
+                <p>Pick which Integration this channel belongs to, then give the channel its own name and description, separate from the integration's. One integration can own several channels — Suvidha POS, for example, might eventually have a channel each for bill settlements, refunds, and shift closures, all sharing the same authentication key/IV but each with its own entry point, retention, and destinations.</p>
+                <img class="guide-shot" src="/static/img/guide/channels-wizard-step1.jpg" alt="Step 1 of the new transmission channel wizard filled in for Bill Settlement Sync under Suvidha POS">
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-step-num">3</div>
+              <div class="guide-step-body">
+                <h3>Step 2 — Channel Setup</h3>
+                <p>Set the <code>Entry point</code> slug — this becomes the path third parties POST encrypted payloads to (use "Copy URL" to grab the full ingest URL to hand off), and <code>Keep transmission requests for (days)</code> — how long a request's record stays queryable before it's cleaned up automatically.</p>
+                <p>Then add one or more <code>Destinations</code>, each with its own endpoint URL and <code>Gap between sends</code> (seconds of pacing between consecutive deliveries to that destination — this is the throttle that protects the real backend). With a single destination, like Order Sync's <strong>Inventory API</strong>, every request that arrives goes straight there — no routing configuration needed at all.</p>
+                <p>Add a second destination and a <code>Routing field</code> box appears above the destinations list. Bill Settlement Sync below names that field <code>payment_type</code>, and its two destinations — <strong>UPI Payments API</strong> (routing value <code>upi</code>) and <strong>Card Payments API</strong> (routing value <code>card</code>) — each claim one value. When a payload arrives, Queue Manager reads <code>payment_type</code> out of the decrypted JSON and hands the request to whichever destination's value matches — a single lookup at the moment it arrives, so it stays fast and simple even with several destinations.</p>
+                <img class="guide-shot" src="/static/img/guide/channels-wizard-step2.jpg" alt="Step 2 of the new transmission channel wizard: entry point, TTL, routing field payment_type, and the UPI Payments API destination">
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-step-num">4</div>
+              <div class="guide-step-body">
+                <h3>Step 3 — Review</h3>
+                <p>Review shows every destination with its resolved routing rule in plain language — "UPI Payments API — routes when <code>payment_type</code> = <code>upi</code>" — so you can sanity-check the whole fan-out at a glance before committing. From here, "Download sample integration doc" generates a Markdown file with the real ingest URL, the required headers, the AES-256-CBC encryption recipe (the exact PHP snippet a third-party developer would use), the integration's key/IV already filled in, the routing key and its values if this channel routes, and — per destination — a sample plaintext JSON body, that same body already encrypted with the integration's real key/IV, and a ready-to-run <code>curl</code> command built from it. The encrypted samples are generated live in your browser, so the <code>curl</code> commands in the file are genuine working requests, not placeholders — copy one straight into a terminal to smoke-test the channel before any third party writes a line of code. Hand the file to whoever's implementing the sending side and there's nothing left for them to guess.</p>
+                <img class="guide-shot" src="/static/img/guide/channels-wizard-step3.jpg" alt="Step 3 of the new transmission channel wizard: review showing both destinations' routing rules and the download sample doc button">
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-step-num">5</div>
+              <div class="guide-step-body">
+                <h3>Save, then activate</h3>
+                <p>Saving creates the channel in an inactive state — nothing is listening yet. Click "Activate" on its row to start a worker processing for each destination; the entry point only starts accepting traffic once this happens. "Deactivate" reverses it without deleting anything — requests already waiting for a destination stay queued untouched, so pausing a channel to fix a downstream issue never drops a backlog. <strong>Loyalty Points Sync</strong> below is a real example of a paused channel sitting in exactly that state.</p>
+                <img class="guide-shot" src="/static/img/guide/channels-list-with-activate.jpg" alt="Transmission Channels list with Loyalty Points Sync inactive and an Activate button on its row">
+              </div>
+            </div>
+          </section>
+
+          <section class="guide-topic" id="topic-requests">
+            <h2>Monitor &amp; retry Transmission Requests</h2>
+            <p class="guide-topic-intro">Every payload that hits a channel's entry point becomes one Transmission Request — this is the single place to see everything that has flowed through the queue, in every state, across every channel and destination, and to step in by hand when something on the receiving end goes wrong.</p>
+
+            <div class="guide-step">
+              <div class="guide-step-num">1</div>
+              <div class="guide-step-body">
+                <h3>Open Transmission Requests</h3>
+                <p>Narrow the grid with the dropdowns — by transmission channel, by status (<span class="mono">pending</span>, <span class="mono">processing</span>, <span class="mono">success</span>, <span class="mono">failed</span>), or by a date range — then click Filter, or search the currently loaded rows by request ID or channel name. The coloured rail on the left edge of each row is the fastest way to scan a long list for trouble: green for success, red for failed, at a glance without reading the Status column at all.</p>
+                <p>Below, ten requests have already landed across all four channels — order events from Saffron ERP, UPI and card settlements from Suvidha POS split correctly by the routing rule you set up above, shipment updates from Bharat Logistics Hub, and loyalty accrual events from Anand Retail Systems, all successful, plus one Order Sync request that failed and was retried.</p>
+                <img class="guide-shot" src="/static/img/guide/requests-grid.jpg" alt="Transmission Requests grid with ten rows across four channels including one Order Sync retry">
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-step-num">2</div>
+              <div class="guide-step-body">
+                <h3>Open a failed request</h3>
+                <p>Click "View" on any row to see its full detail: which channel and destination it was headed to, the exact destination endpoint URL that was called, the request's decrypted body exactly as it was received (handy for confirming the third party is actually sending what you expect), and the raw response — HTTP status plus body — that came back from the destination. Below, a Saffron ERP order for customer Anil Deshmukh failed with an HTTP 500 because the Inventory API was temporarily pointed at a broken endpoint; the response body makes the reason obvious without needing to check server logs.</p>
+                <img class="guide-shot" src="/static/img/guide/requests-detail-failed.jpg" alt="Transmission Request detail dialog for a failed Order Sync request showing the decrypted payload and a 500 response">
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-step-num">3</div>
+              <div class="guide-step-body">
+                <h3>Retry it</h3>
+                <p>Fix the underlying problem first — in this example, that means correcting the destination's endpoint URL back on the Transmission Channel — then click Retry from the detail dialog or straight from the grid row. Queue Manager always re-publishes against the destination's <em>current</em> configuration, not whatever was in effect at the moment it first failed, so "fix the endpoint, then retry" genuinely works. The retry count on the row ticks up by one and the original decrypted payload is reused as-is — nothing is re-entered, re-typed, or re-encrypted by hand. Below, the same request now shows Success, HTTP 200, and one retry.</p>
+                <img class="guide-shot" src="/static/img/guide/requests-after-retry.jpg" alt="Transmission Requests grid showing the previously-failed Order Sync request now succeeded with a retry count of 1">
+                <p class="guide-callout">Retry is always a manual, deliberate action — Queue Manager never auto-retries a failed request on its own. That's a conscious choice: a downstream outage shouldn't turn into a retry storm hammering the same broken endpoint.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="guide-topic" id="topic-admins">
+            <h2>Manage your team</h2>
+            <p class="guide-topic-intro">Console Admins are the people who can sign in and manage this console. They're added here by an existing admin, not through public sign-up — there's deliberately no registration page.</p>
+
+            <div class="guide-step">
+              <div class="guide-step-num">1</div>
+              <div class="guide-step-body">
+                <h3>Open Console Admins</h3>
+                <p>The very first admin ever seeded on a fresh install becomes the <strong>Super Admin</strong> automatically — that's <strong>Rohan Mehta</strong> below. Only a Super Admin can create new console admins or turn off someone else's two-factor authentication; every other admin can see this list, including everyone's role and 2FA status, but can't edit it, add to it, or act on anyone but themselves. <strong>Ananya Iyer</strong> already has 2FA on, <strong>Vikram Nair</strong> is mid-enrollment ("Pending setup" — created with 2FA required, hasn't finished scanning the QR code yet), and Rohan Mehta hasn't turned it on for his own account yet.</p>
+                <img class="guide-shot" src="/static/img/guide/admins-list.jpg" alt="Console Admins list showing Super Admin Rohan Mehta, Ananya Iyer with 2FA on, and Vikram Nair pending 2FA setup">
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-step-num">2</div>
+              <div class="guide-step-body">
+                <h3>Create a new console admin</h3>
+                <p>As a Super Admin, click "+ New console admin" and fill in their name, an optional contact number, email, and a starting password (at least 8 characters — they can't change it themselves yet, so pick something you'll hand off securely). Check <strong>"Require two-factor authentication setup before first login"</strong> — shown checked below for Vikram Nair — to force them through QR-code enrollment with an authenticator app the very first time they sign in; they can't reach any other page in the console until they've confirmed a valid code. Leave it unchecked and they can sign in with just their password and opt into 2FA later on their own terms.</p>
+                <img class="guide-shot" src="/static/img/guide/admins-new-form.jpg" alt="New console admin dialog filled in for Vikram Nair with the Require two-factor authentication checkbox checked">
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="guide-step-num">3</div>
+              <div class="guide-step-body">
+                <h3>2FA after that: self-service on, Super Admin off</h3>
+                <p>Turning 2FA <em>on</em> is unrestricted self-service for every admin, regardless of role — from this same list, at any time, you can enable it for your own account, no one else's approval needed, because scanning your own QR code can't affect anyone but you.</p>
+                <p>Turning it back <em>off</em> is deliberately one-directional: only a Super Admin can disable another admin's 2FA, and not even for their own account without going through the same super-admin path. That asymmetry is intentional — disabling an already-active protection is treated as a recovery action that needs a second party involved, exactly the situation you're in when someone loses their phone or reinstalls their authenticator app and needs back in.</p>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/guide.js"></script>
+</body>
+</html>

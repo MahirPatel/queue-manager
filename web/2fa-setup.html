@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Set up two-factor authentication — Queue Manager</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="login-shell">
+    <div class="login-card">
+      <div class="login-brand"><span class="brand-mark">◆</span> Queue Manager</div>
+      <p class="login-sub">Set up two-factor authentication for your account.</p>
+
+      <div class="banner banner-error" id="errorBanner"></div>
+
+      <p class="hint" id="loadingState">Generating your setup code…</p>
+
+      <div id="setupState" style="display:none">
+        <div class="qr-block">
+          <img id="qrImage" alt="Scan this QR code with your authenticator app" width="180" height="180">
+        </div>
+        <p class="hint">Scan this with an authenticator app (Google Authenticator, Authy, 1Password, etc.). Can't scan it? Enter this key manually instead:</p>
+        <div class="secret-cell">
+          <code class="mono" id="secretText"></code>
+          <button type="button" class="btn btn-sm" id="copySecretBtn">Copy</button>
+        </div>
+
+        <form id="confirmForm">
+          <div class="field">
+            <label for="totpCode">Authenticator code</label>
+            <input type="text" id="totpCode" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required>
+            <p class="hint">Enter the 6-digit code your app is showing now.</p>
+          </div>
+          <button type="submit" class="btn btn-primary">Verify &amp; continue</button>
+        </form>
+      </div>
+
+      <p class="login-footnote"><button type="button" class="plain-link" id="logoutBtn">Log out</button></p>
+    </div>
+  </div>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/2fa-setup.js"></script>
+</body>
+</html>

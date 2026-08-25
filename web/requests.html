@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transmission Requests — Queue Manager</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body data-page="requests">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">◆</span> Queue Manager</div>
+      <nav>
+        <a href="/dashboard.html" data-nav="dashboard">Dashboard</a>
+        <a href="/products.html" data-nav="products">Integrations</a>
+        <a href="/templates.html" data-nav="templates">Transmission Channels</a>
+        <a href="/requests.html" data-nav="requests">Transmission Requests</a>
+        <a href="/admins.html" data-nav="admins">Console Admins</a>
+        <a href="/guide.html" data-nav="guide">Setup Guide</a>
+      </nav>
+      <div class="sidebar-footer">
+        <span id="whoami" class="whoami"></span>
+        <button id="logoutBtn" class="link-btn">Log out</button>
+        <div class="app-credit">Created by Mahir Patel &middot; 2026</div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="content-header">
+        <div>
+          <h1>Transmission Requests</h1>
+          <p class="content-sub">Every transmission request the queue has ingested, its outcome, and manual retry when it failed.</p>
+        </div>
+      </header>
+
+      <div class="banner banner-error" id="errorBanner"></div>
+
+      <div class="toolbar">
+        <select id="filterTemplate"><option value="">All transmission channels</option></select>
+        <select id="filterStatus">
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="processing">Processing</option>
+          <option value="success">Success</option>
+          <option value="failed">Failed</option>
+        </select>
+        <input type="datetime-local" id="filterFrom" title="From">
+        <input type="datetime-local" id="filterTo" title="To">
+        <button class="btn" id="applyFilters">Filter</button>
+        <div class="spacer"></div>
+        <button class="btn" id="refreshBtn">Refresh</button>
+      </div>
+
+      <div class="toolbar">
+        <input type="search" id="requestSearch" placeholder="Search loaded rows by request ID or transmission channel…">
+        <div class="spacer"></div>
+        <div class="dropdown" id="exportDropdown">
+          <button class="btn btn-sm" id="exportMenuBtn" type="button" aria-haspopup="true" aria-expanded="false">Export <span class="dropdown-caret">▾</span></button>
+          <div class="dropdown-menu" id="exportMenu" hidden>
+            <button type="button" class="dropdown-item" id="exportVisibleBtn" title="Export the rows currently loaded and matching your search">Export visible rows</button>
+            <button type="button" class="dropdown-item" id="exportAllBtn" title="Fetch and export every transmission request matching the filters above (ignores the search box, can take a while for large result sets)">Export all rows (matching filters)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <table>
+          <thead>
+            <tr><th>Transmission Request</th><th>Transmission Channel</th><th>Status</th><th>HTTP</th><th>Requested</th><th>Retries</th><th></th></tr>
+          </thead>
+          <tbody id="requestsBody">
+            <tr><td colspan="7" class="empty-state">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:14px; text-align:center">
+        <button class="btn" id="loadMoreBtn" style="display:none">Load more</button>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="detailDialog">
+    <div class="dialog-header">
+      <h2>Transmission Request detail</h2>
+      <button type="button" class="dialog-close" data-close>&times;</button>
+    </div>
+    <div class="dialog-body" id="detailBody"></div>
+    <div class="dialog-footer">
+      <button type="button" class="btn" data-close>Close</button>
+      <button type="button" class="btn btn-primary" id="retryFromDialogBtn" style="display:none">Retry</button>
+    </div>
+  </dialog>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/requests.js"></script>
+</body>
+</html>

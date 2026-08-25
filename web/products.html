@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Integrations — Queue Manager</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body data-page="products">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">◆</span> Queue Manager</div>
+      <nav>
+        <a href="/dashboard.html" data-nav="dashboard">Dashboard</a>
+        <a href="/products.html" data-nav="products">Integrations</a>
+        <a href="/templates.html" data-nav="templates">Transmission Channels</a>
+        <a href="/requests.html" data-nav="requests">Transmission Requests</a>
+        <a href="/admins.html" data-nav="admins">Console Admins</a>
+        <a href="/guide.html" data-nav="guide">Setup Guide</a>
+      </nav>
+      <div class="sidebar-footer">
+        <span id="whoami" class="whoami"></span>
+        <button id="logoutBtn" class="link-btn">Log out</button>
+        <div class="app-credit">Created by Mahir Patel &middot; 2026</div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="content-header">
+        <div>
+          <h1>Integrations</h1>
+          <p class="content-sub">Third-party systems that send data into the queue, and the key they use to encrypt it.</p>
+        </div>
+        <button class="btn btn-primary" id="newProductBtn">+ New integration</button>
+      </header>
+
+      <div class="banner banner-error" id="errorBanner"></div>
+
+      <div class="toolbar">
+        <input type="search" id="productSearch" placeholder="Search by name or description…">
+        <div class="spacer"></div>
+        <div class="dropdown" id="exportDropdown">
+          <button class="btn btn-sm" id="exportMenuBtn" type="button" aria-haspopup="true" aria-expanded="false">Export <span class="dropdown-caret">▾</span></button>
+          <div class="dropdown-menu" id="exportMenu" hidden>
+            <button type="button" class="dropdown-item" id="exportVisibleBtn" title="Export the rows matching your current search">Export visible rows</button>
+            <button type="button" class="dropdown-item" id="exportAllBtn" title="Export every integration, ignoring search">Export all rows</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Description</th><th>Auth Key</th><th>Auth IV</th><th>Updated</th><th>Action</th></tr>
+          </thead>
+          <tbody id="productsBody">
+            <tr><td colspan="6" class="empty-state">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="load-more">
+        <button class="btn" id="productsLoadMoreBtn" style="display:none">Load more</button>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="productDialog">
+    <form id="productForm">
+      <div class="dialog-header">
+        <h2 id="productDialogTitle">New integration</h2>
+        <button type="button" class="dialog-close" data-close>&times;</button>
+      </div>
+      <div class="dialog-body">
+        <div class="banner banner-error" id="productFormError"></div>
+        <input type="hidden" id="productId">
+        <div class="field">
+          <label for="productName">Name</label>
+          <input type="text" id="productName" required>
+        </div>
+        <div class="field">
+          <label for="productDescription">Description</label>
+          <input type="text" id="productDescription">
+        </div>
+        <div class="field field-mono">
+          <label for="productKey">Authentication key (32 characters)</label>
+          <input type="text" id="productKey" required minlength="32" maxlength="32">
+          <p class="hint">Used as the AES-256 key for decrypting this integration's transmission requests.</p>
+        </div>
+        <div class="field field-mono">
+          <label for="productIv">Authentication IV (16 characters)</label>
+          <input type="text" id="productIv" required minlength="16" maxlength="16">
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save integration</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/products.js"></script>
+</body>
+</html>

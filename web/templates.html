@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transmission Channels — Queue Manager</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body data-page="templates">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">◆</span> Queue Manager</div>
+      <nav>
+        <a href="/dashboard.html" data-nav="dashboard">Dashboard</a>
+        <a href="/products.html" data-nav="products">Integrations</a>
+        <a href="/templates.html" data-nav="templates">Transmission Channels</a>
+        <a href="/requests.html" data-nav="requests">Transmission Requests</a>
+        <a href="/admins.html" data-nav="admins">Console Admins</a>
+        <a href="/guide.html" data-nav="guide">Setup Guide</a>
+      </nav>
+      <div class="sidebar-footer">
+        <span id="whoami" class="whoami"></span>
+        <button id="logoutBtn" class="link-btn">Log out</button>
+        <div class="app-credit">Created by Mahir Patel &middot; 2026</div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="content-header">
+        <div>
+          <h1>Transmission Channels</h1>
+          <p class="content-sub">Each transmission channel routes one entry point to one or more destinations, at a controlled pace.</p>
+        </div>
+        <button class="btn btn-primary" id="newTemplateBtn">+ New transmission channel</button>
+      </header>
+
+      <div class="banner banner-error" id="errorBanner"></div>
+
+      <div class="toolbar">
+        <input type="search" id="templateSearch" placeholder="Search by name, integration, or entry point…">
+        <div class="spacer"></div>
+        <div class="dropdown" id="exportDropdown">
+          <button class="btn btn-sm" id="exportMenuBtn" type="button" aria-haspopup="true" aria-expanded="false">Export <span class="dropdown-caret">▾</span></button>
+          <div class="dropdown-menu" id="exportMenu" hidden>
+            <button type="button" class="dropdown-item" id="exportVisibleBtn" title="Export the rows matching your current search">Export visible rows</button>
+            <button type="button" class="dropdown-item" id="exportAllBtn" title="Export every transmission channel, ignoring search">Export all rows</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Integration</th><th>Entry point</th><th>Destinations</th><th>TTL</th><th>Status</th><th>Action</th></tr>
+          </thead>
+          <tbody id="templatesBody">
+            <tr><td colspan="7" class="empty-state">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="load-more">
+        <button class="btn" id="templatesLoadMoreBtn" style="display:none">Load more</button>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="templateDialog" class="dialog-wide">
+    <form id="templateForm">
+      <div class="dialog-header">
+        <h2 id="templateDialogTitle">New transmission channel</h2>
+        <button type="button" class="dialog-close" data-close>&times;</button>
+      </div>
+      <div class="dialog-body">
+        <div class="banner banner-error" id="templateFormError"></div>
+        <input type="hidden" id="templateId">
+
+        <div class="step-indicator" id="stepIndicator">
+          <div class="step-indicator-item" data-step="1"><span class="step-num">1</span><span class="step-label">Channel Detail</span></div>
+          <div class="step-indicator-item" data-step="2"><span class="step-num">2</span><span class="step-label">Channel Setup</span></div>
+          <div class="step-indicator-item" data-step="3"><span class="step-num">3</span><span class="step-label">Review</span></div>
+        </div>
+
+        <div id="step1">
+          <div class="field">
+            <label for="templateProduct">Integration</label>
+            <select id="templateProduct" required></select>
+          </div>
+          <div class="field">
+            <label for="templateName">Name</label>
+            <input type="text" id="templateName" required>
+            <p class="hint hint-error" id="templateNameHint"></p>
+          </div>
+          <div class="field">
+            <label for="templateDescription">Description</label>
+            <input type="text" id="templateDescription">
+          </div>
+        </div>
+
+        <div id="step2" style="display:none">
+          <div class="field">
+            <label for="templateEntryPoint">Entry point</label>
+            <div class="input-with-button">
+              <input type="text" id="templateEntryPoint" required placeholder="inventory-order-sync">
+              <button type="button" class="btn btn-sm" id="copyEntryPointBtn">Copy URL</button>
+            </div>
+            <p class="hint">Third parties will POST to <code id="entryPointPreview">/ingest/…</code></p>
+            <p class="hint hint-error" id="templateEntryPointHint"></p>
+          </div>
+          <div class="field">
+            <label for="templateTtl">Keep transmission requests for (days)</label>
+            <input type="number" id="templateTtl" required min="1" step="1" value="60">
+          </div>
+
+          <div class="field" id="routingFieldWrap" style="display:none">
+            <label for="templateRoutingField">Routing field</label>
+            <input type="text" id="templateRoutingField" placeholder="event_type">
+            <p class="hint">The field to read in each incoming payload to pick which destination below it goes to.</p>
+          </div>
+
+          <div class="destinations-section">
+            <div class="destinations-header">
+              <label>Destinations</label>
+              <button type="button" class="btn btn-sm" id="addDestinationBtn">+ Add destination</button>
+            </div>
+            <p class="hint" style="margin-bottom:8px">One destination routes everything. Add more to fan out by routing field value.</p>
+            <div id="destinationsList"></div>
+          </div>
+        </div>
+
+        <div id="step3" style="display:none">
+          <p class="hint" style="margin-bottom:12px">Review everything below before saving. Download the integration guide to hand to whoever's implementing the sending side.</p>
+          <div id="reviewContent"></div>
+          <button type="button" class="btn btn-sm" id="downloadSampleDocBtn" style="margin-top:14px">Download sample integration doc</button>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="btn" id="wizardBackBtn">Cancel</button>
+        <button type="button" class="btn btn-primary" id="wizardNextBtn">Next</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/templates.js"></script>
+</body>
+</html>
