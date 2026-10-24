@@ -158,12 +158,12 @@
           </div>
           <div class="field dest-routing-value-field">
             <label>Routing value</label>
-            <input type="text" class="dest-routing-value" placeholder="order.created" value="${escapeHtml(d.destination_routing_value || "")}">
+            <input type="text" class="dest-routing-value" placeholder="customer.created" value="${escapeHtml(d.destination_routing_value || "")}">
           </div>
         </div>
         <div class="field">
           <label>Destination endpoint URL</label>
-          <input type="text" class="dest-endpoint" required placeholder="https://internal.example.com/inventory/purchase" value="${escapeHtml(d.destination_end_point || "")}">
+          <input type="text" class="dest-endpoint" required placeholder="https://internal.example.com/accounts/customers" value="${escapeHtml(d.destination_end_point || "")}">
         </div>
         <div class="field">
           <label>Gap between sends (seconds)</label>
@@ -308,7 +308,7 @@
   }
 
   // Builds a hand-off doc for whoever implements the sending side — full
-  // ingest URL, headers, the encryption recipe, the integration's actual
+  // ingest URL, headers, the encryption steps, the integration's actual
   // key/IV (already visible to any console admin elsewhere in the app —
   // this is a display convenience, not a new exposure), the routing key
   // if this channel fans out, a sample plaintext + encrypted body per

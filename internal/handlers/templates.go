@@ -35,7 +35,7 @@ type templateInput struct {
 	ProductID              string             `json:"product_id"`
 	TemplateName           string             `json:"template_name"`
 	TemplateDescription    string             `json:"template_description"`
-	TemplateEntryPoint     string             `json:"template_entry_point"` // slug, e.g. "inventory-order-sync"
+	TemplateEntryPoint     string             `json:"template_entry_point"` // slug, e.g. "customer-sync"
 	TemplateRoutingField   string             `json:"template_routing_field"`
 	Destinations           []destinationInput `json:"destinations"`
 	TemplateRequestTTLDays int                `json:"template_request_ttl_days"`

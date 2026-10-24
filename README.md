@@ -1,7 +1,7 @@
 # Queue Manager
 
-An open-source, self-hosted service that decouples third-party systems (an
-ERP, a POS, a logistics platform — anything external) from calling your
+An open-source, self-hosted service that decouples third-party systems (a
+CRM, a billing system, an email provider — anything external) from calling your
 backend services directly, so a burst or a misbehaving integration never
 turns into a spike against production.
 
@@ -47,7 +47,7 @@ or collection name, it uses the code name verbatim in backticks.
 
 ```mermaid
 flowchart LR
-    TP["Third party<br/>ERP, POS, ..."] -->|POST encrypted payload| ING["Ingest endpoint"]
+    TP["Third party<br/>CRM, billing, ..."] -->|POST encrypted payload| ING["Ingest endpoint"]
     ING --> DEC["Decrypt with the<br/>integration's key/IV"]
     DEC --> ROUTE["Resolve destination<br/>routing field, if more than one"]
     ROUTE --> MONGO["MongoDB<br/>requests: pending"]
@@ -317,7 +317,7 @@ every screenshot below matches what you'd actually see.
 ### 1. Create an Integration
 
 An Integration represents one third-party system that will send data into
-the queue — an ERP, a POS, a logistics platform, anything that needs to
+the queue — a CRM, a billing system, an email provider, anything that needs to
 call into your backend without calling it directly. Each one gets its own
 AES-256 key and IV, so a problem with one third party's credentials never
 affects another's. Create the integration first; a Transmission Channel
@@ -329,7 +329,7 @@ authentication key/IV (masked on screen, with a one-click Copy button — the
 API still returns the real values to any signed-in console admin, this is
 just a display choice).
 
-![Integrations list showing Saffron ERP, Suvidha POS, Bharat Logistics Hub, and Anand Retail Systems](web/static/img/guide/integrations-list.jpg)
+![Integrations list showing Atlas HR, Helix Billing, Northwind CRM, and Orbit Mail](web/static/img/guide/integrations-list.jpg)
 
 Give the integration a name and description, then set:
 
@@ -340,7 +340,7 @@ Both travel to the third party out of band (Slack, a shared doc, however
 you hand off credentials today) — Queue Manager never transmits them
 anywhere itself, it only stores them to decrypt what comes back in.
 
-![New integration dialog filled in for Saffron ERP with name, description, authentication key and IV](web/static/img/guide/integrations-new-form.jpg)
+![New integration dialog filled in for Quill Support with name, description, authentication key and IV](web/static/img/guide/integrations-new-form.jpg)
 
 Save, and the integration is ready to be attached to one or more
 Transmission Channels. Nothing is listening for traffic yet — an
@@ -358,7 +358,7 @@ Each row shows which integration the channel belongs to, its entry point,
 how many destinations it fans out to, its retention (TTL), and whether
 it's active.
 
-![Transmission Channels list showing Bill Settlement Sync, Loyalty Points Sync (inactive), Order Sync, and Shipment Status Sync](web/static/img/guide/channels-list.jpg)
+![Transmission Channels list showing Customer Sync, Email Status Sync, Employee Sync (inactive), and Payment Events](web/static/img/guide/channels-list.jpg)
 
 The dialog is a 3-step wizard:
 
@@ -367,7 +367,7 @@ to, then give the channel its own name and description. One integration
 can own several channels — sharing the same key/IV but each with its own
 entry point, retention, and destinations.
 
-![Step 1 of the new transmission channel wizard filled in for Bill Settlement Sync under Suvidha POS](web/static/img/guide/channels-wizard-step1.jpg)
+![Step 1 of the new transmission channel wizard filled in for Payment Events under Helix Billing](web/static/img/guide/channels-wizard-step1.jpg)
 
 **Step 2 — Channel Setup.** Set the entry point slug (the path third
 parties POST to) and how long to keep request records before automatic
@@ -377,18 +377,18 @@ the real backend. With a single destination, every request goes straight
 there, no routing needed.
 
 Add a second destination and a **Routing field** appears. Below,
-`payment_type` routes to **UPI Payments API** (value `upi`) or **Card
-Payments API** (value `card`) — Queue Manager reads that field out of the
+`payment_method` routes to **Card Payments API** (value `card`) or **UPI
+Payments API** (value `upi`) — Queue Manager reads that field out of the
 decrypted payload and hands the request to whichever destination's value
 matches.
 
-![Step 2 of the new transmission channel wizard: entry point, TTL, routing field payment_type, and the UPI Payments API destination](web/static/img/guide/channels-wizard-step2.jpg)
+![Step 2 of the new transmission channel wizard: entry point, TTL, routing field payment_method, and the Card Payments API destination](web/static/img/guide/channels-wizard-step2.jpg)
 
 **Step 3 — Review.** Shows every destination with its resolved routing
 rule in plain language, so you can sanity-check the whole fan-out before
 committing. From here, **Download sample integration doc** generates a
 Markdown handoff file with the real ingest URL, headers, the encryption
-recipe, the integration's key/IV, and — per destination — a sample payload
+steps, the integration's key/IV, and — per destination — a sample payload
 already encrypted with the real key/IV plus a ready-to-run `curl` command,
 so whoever implements the sending side has nothing left to guess.
 
@@ -401,7 +401,7 @@ without deleting anything — requests already waiting for a destination
 stay queued untouched, so pausing a channel to fix a downstream issue never
 drops a backlog.
 
-![Transmission Channels list with Loyalty Points Sync inactive and an Activate button on its row](web/static/img/guide/channels-list-with-activate.jpg)
+![Transmission Channels list with Employee Sync inactive and an Activate button on its row](web/static/img/guide/channels-list-with-activate.jpg)
 
 ### 3. Monitor & retry Transmission Requests
 
@@ -416,16 +416,16 @@ currently loaded rows by request ID or channel name. The colored rail on
 the left edge of each row is the fastest way to scan a long list for
 trouble — green for success, red for failed.
 
-![Transmission Requests grid with ten rows across four channels including one Order Sync retry](web/static/img/guide/requests-grid.jpg)
+![Transmission Requests grid with requests across all four channels, including one failed Customer Sync request](web/static/img/guide/requests-grid.jpg)
 
 Click **View** on any row for its full detail: which channel and
 destination it was headed to, the exact endpoint URL called, the request's
 decrypted body exactly as received, and the raw response (HTTP status +
-body) that came back. Below, an order failed with HTTP 500 because the
-destination endpoint was temporarily broken — the response body makes the
-reason obvious without needing to check server logs.
+body) that came back. Below, a customer update failed with HTTP 500
+because the channel had been pointed at a v2 endpoint that wasn't live
+yet — the response body makes the reason obvious without needing to check server logs.
 
-![Transmission Request detail dialog for a failed Order Sync request showing the decrypted payload and a 500 response](web/static/img/guide/requests-detail-failed.jpg)
+![Transmission Request detail dialog for a failed Customer Sync request showing the decrypted payload and a 500 response](web/static/img/guide/requests-detail-failed.jpg)
 
 Fix the underlying problem first (in this example, correct the
 destination's endpoint URL on the channel), then click **Retry** from the
@@ -435,7 +435,7 @@ effect when it first failed — so "fix the endpoint, then retry" genuinely
 works. The retry count ticks up and the original decrypted payload is
 reused as-is.
 
-![Transmission Requests grid showing the previously-failed Order Sync request now succeeded with a retry count of 1](web/static/img/guide/requests-after-retry.jpg)
+![Transmission Requests grid showing the previously-failed Customer Sync request now succeeded with a retry count of 1](web/static/img/guide/requests-after-retry.jpg)
 
 Retry is always a manual, deliberate action — Queue Manager never
 auto-retries a failed request on its own. A downstream outage shouldn't
@@ -632,3 +632,14 @@ destinations to forward to, asserts on the outcome of each step, and tears
 everything down when it's done — pass or fail. Requires Docker and Go on
 the host (Go is only needed to build a tiny test-payload encryption
 helper; the app itself never needs it to run in Docker).
+
+## Contributing
+
+Contributions are welcome. Open an issue to report a bug or discuss an
+idea, or send a pull request. Please run `go test ./...` (and
+`./scripts/e2e-docker-test.sh` if you touched the worker or dispatch code)
+before opening it.
+
+## License
+
+[MIT](LICENSE). Free to use, modify, and distribute.
